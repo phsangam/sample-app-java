@@ -1,0 +1,47 @@
+name: Build and Push Java Service
+
+on:
+  push:
+    branches: [main]
+
+env:
+  ECR_REGISTRY: 569085067591.dkr.ecr.ap-south-1.amazonaws.com
+  ECR_REPOSITORY: uat-java-service
+  IMAGE_TAG: ${{ github.sha }}
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Login to ECR
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Build and Push
+        run: |
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+          docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
+                     $ECR_REGISTRY/$ECR_REPOSITORY:latest
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+
+      - name: Update Helm values in config repo
+        run: |
+          git clone https://x-access-token:${{ secrets.CONFIG_REPO_TOKEN }}@github.com/phsangam/sample-app-config.git
+          cd sample-app-config
+          sed -i "s|tag:.*|tag: \"$IMAGE_TAG\"|" helm/java-service/values.yaml
+          git config user.email "github-actions@ci.com"
+          git config user.name "GitHub Actions"
+          git add .
+          git commit -m "Update java-service image tag to $IMAGE_TAG"
+          git push
