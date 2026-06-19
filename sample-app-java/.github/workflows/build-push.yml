@@ -2,7 +2,7 @@ name: Build and Push Java Service
 
 on:
   push:
-    branches: [main]
+    branches: [master]
 
 env:
   ECR_REGISTRY: 569085067591.dkr.ecr.ap-south-1.amazonaws.com
